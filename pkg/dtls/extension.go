@@ -11,6 +11,7 @@ const (
 	extensionSupportedEllipticCurvesValue extensionValue = 10
 	extensionSupportedPointFormatsValue   extensionValue = 11
 	extensionUseSRTPValue                 extensionValue = 14
+	extensionConnectionIdValue            extensionValue = 52 // provisional
 )
 
 type extension interface {
@@ -43,6 +44,8 @@ func decodeExtensions(buf []byte) ([]extension, error) {
 			err = unmarshalAndAppend(buf[offset:], &extensionSupportedEllipticCurves{})
 		case extensionUseSRTPValue:
 			err = unmarshalAndAppend(buf[offset:], &extensionUseSRTP{})
+		case extensionConnectionIdValue:
+			err = unmarshalAndAppend(buf[offset:], &extensionConnectionId{})
 		default:
 		}
 		if err != nil {
