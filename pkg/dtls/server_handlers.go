@@ -2,6 +2,7 @@ package dtls
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 )
 
@@ -51,6 +52,14 @@ func serverHandshakeHandler(c *Conn) error {
 					c.namedCurve = e.ellipticCurves[0]
 				case *extensionUseSRTP:
 					// TODO expose to API
+				case *extensionConnectionId:
+					if len(e.connectionId) > 0 {
+						c.ccid = e.connectionId
+					}
+					// generate a random server cid
+					tmp := make([]byte, extensionConnectionIdSize)
+					rand.Read(tmp)
+					c.scid = tmp
 				}
 			}
 
@@ -112,6 +121,9 @@ func serverHandshakeHandler(c *Conn) error {
 				if err := c.currFlight.set(flight6); err != nil {
 					return err
 				}
+				if c.scid != nil {
+					fmt.Println("TODO(tho) replace 5-tuple with c.scid")
+				}
 			}
 
 		default:
@@ -148,6 +160,31 @@ func serverFlightHandler(c *Conn) (bool, error) {
 
 	case flight4:
 		c.lock.RLock()
+
+		serverHello := handshakeMessageServerHello{
+			version:           protocolVersion1_2,
+			random:            c.localRandom,
+			cipherSuite:       c.cipherSuite,
+			compressionMethod: defaultCompressionMethods[0],
+			extensions: []extension{
+				&extensionSupportedEllipticCurves{
+					ellipticCurves: []namedCurve{namedCurveX25519, namedCurveP256},
+				},
+				&extensionUseSRTP{
+					protectionProfiles: []srtpProtectionProfile{SRTP_AES128_CM_HMAC_SHA1_80},
+				},
+				&extensionSupportedPointFormats{
+					pointFormats: []ellipticCurvePointFormat{ellipticCurvePointFormatUncompressed},
+				},
+			},
+		}
+
+		if c.scid != nil {
+			serverHello.extensions = append(serverHello.extensions, &extensionConnectionId{
+				connectionId: c.scid,
+			})
+		}
+
 		c.internalSend(&recordLayer{
 			recordLayerHeader: recordLayerHeader{
 				sequenceNumber:  c.localSequenceNumber,
@@ -158,23 +195,8 @@ func serverFlightHandler(c *Conn) (bool, error) {
 				handshakeHeader: handshakeHeader{
 					messageSequence: uint16(c.localSequenceNumber),
 				},
-				handshakeMessage: &handshakeMessageServerHello{
-					version:           protocolVersion1_2,
-					random:            c.localRandom,
-					cipherSuite:       c.cipherSuite,
-					compressionMethod: defaultCompressionMethods[0],
-					extensions: []extension{
-						&extensionSupportedEllipticCurves{
-							ellipticCurves: []namedCurve{namedCurveX25519, namedCurveP256},
-						},
-						&extensionUseSRTP{
-							protectionProfiles: []srtpProtectionProfile{SRTP_AES128_CM_HMAC_SHA1_80},
-						},
-						&extensionSupportedPointFormats{
-							pointFormats: []ellipticCurvePointFormat{ellipticCurvePointFormatUncompressed},
-						},
-					},
-				}},
+				handshakeMessage: &serverHello,
+			},
 		}, false)
 
 		c.internalSend(&recordLayer{

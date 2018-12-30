@@ -47,6 +47,15 @@ func clientHandshakeHandler(c *Conn) error {
 			case flight3:
 				c.cipherSuite = h.cipherSuite
 				c.remoteRandom = h.random
+
+				for _, extension := range h.extensions {
+					switch e := extension.(type) {
+					case *extensionConnectionId:
+						if len(e.connectionId) > 0 {
+							c.scid = e.connectionId
+						}
+					}
+				}
 			}
 
 		case *handshakeMessageCertificate:

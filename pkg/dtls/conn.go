@@ -60,6 +60,8 @@ type Conn struct {
 	handshakeCompleted      chan bool
 
 	connErr atomic.Value
+
+	ccid, scid []byte // client and server connection identifiers
 }
 
 func createConn(nextConn net.Conn, flightHandler flightHandler, handshakeMessageHandler handshakeMessageHandler, config *Config, isClient bool) (*Conn, error) {

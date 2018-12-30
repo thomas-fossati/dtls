@@ -1,6 +1,8 @@
 package dtls
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
 type recordLayerHeader struct {
 	contentType     contentType
@@ -8,7 +10,8 @@ type recordLayerHeader struct {
 	protocolVersion protocolVersion
 	epoch           uint16
 	sequenceNumber  uint64 // uint48 in spec
-
+	cid             []byte
+	cidLen          int // set by the caller for unmarshal
 }
 
 const (
@@ -31,13 +34,26 @@ func (r *recordLayerHeader) Marshal() ([]byte, error) {
 		return nil, errSequenceNumberOverflow
 	}
 
-	out := make([]byte, recordLayerHeaderSize)
+	hlen := recordLayerHeaderSize
+	// expand record header to include CID (if we have been asked to send
+	// one)
+	if r.contentType == contentTypeTLS12CID {
+		hlen += r.cidLen
+	}
+
+	out := make([]byte, hlen)
+
 	out[0] = byte(r.contentType)
 	out[1] = r.protocolVersion.major
 	out[2] = r.protocolVersion.minor
 	binary.BigEndian.PutUint16(out[3:], r.epoch)
 	putBigEndianUint48(out[5:], r.sequenceNumber)
-	binary.BigEndian.PutUint16(out[recordLayerHeaderSize-2:], r.contentLen)
+
+	if r.contentType == contentTypeTLS12CID {
+		copy(out[11:], r.cid)
+	}
+
+	binary.BigEndian.PutUint16(out[hlen-2:], r.contentLen)
 	return out, nil
 }
 
@@ -51,6 +67,14 @@ func (r *recordLayerHeader) Unmarshal(data []byte) error {
 	seqCopy := make([]byte, 8)
 	copy(seqCopy[2:], data[5:11])
 	r.sequenceNumber = binary.BigEndian.Uint64(seqCopy)
+
+	if r.contentType == contentTypeTLS12CID {
+		// there must be enough bytes for cid + 2 bytes for clen
+		if len(data[11:]) < r.cidLen+2 {
+			return errNotEnoughDataForCID
+		}
+		copy(r.cid, data[11:11+r.cidLen])
+	}
 
 	return nil
 }
