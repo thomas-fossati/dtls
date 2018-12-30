@@ -41,4 +41,5 @@ var (
 	errServerMustHaveCertificate         = errors.New("dtls: Certificate is mandatory for server")
 	errUnableToMarshalFragmented         = errors.New("dtls: unable to marshal fragmented handshakes")
 	errVerifyDataMismatch                = errors.New("dtls: Expected and actual verify data does not match")
+	errConnectionIdTooBig                = errors.New("dtls: the supplied connection id is bigger than 255 bytes")
 )

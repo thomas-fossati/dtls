@@ -158,6 +158,7 @@ func clientFlightHandler(c *Conn) (bool, error) {
 						&extensionSupportedPointFormats{
 							pointFormats: []ellipticCurvePointFormat{ellipticCurvePointFormatUncompressed},
 						},
+						&extensionConnectionId{},
 					},
 				}},
 		}, false)
