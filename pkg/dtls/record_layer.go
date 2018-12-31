@@ -85,12 +85,16 @@ func unpackDatagram(buf []byte) ([][]byte, error) {
 			return nil, errDTLSPacketInvalidLength
 		}
 
+		plenOffset := 11
 		hlen := recordLayerHeaderSize
+		// take care of optional cid which shifts the length field
+		// right while extending the total header size
 		if contentType(buf[offset]) == contentTypeTLS12CID {
+			plenOffset += extensionConnectionIdSize
 			hlen += extensionConnectionIdSize
 		}
 
-		pktLen := (hlen + int(binary.BigEndian.Uint16(buf[offset+11:])))
+		pktLen := (hlen + int(binary.BigEndian.Uint16(buf[offset+plenOffset:])))
 		out = append(out, buf[offset:offset+pktLen])
 		offset += pktLen
 	}
