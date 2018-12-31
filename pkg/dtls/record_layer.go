@@ -2,7 +2,6 @@ package dtls
 
 import (
 	"encoding/binary"
-	"fmt"
 )
 
 /*
@@ -40,9 +39,7 @@ func (r *recordLayer) Marshal() ([]byte, error) {
 		return nil, err
 	}
 
-	out := append(headerRaw, contentRaw...)
-	fmt.Printf("[recordLayer::Marshal] out: % x\n", out)
-	return out, nil
+	return append(headerRaw, contentRaw...), nil
 }
 
 func (r *recordLayer) Unmarshal(data []byte) error {

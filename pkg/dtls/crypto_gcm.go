@@ -79,7 +79,15 @@ func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 }
 
 func (c *cryptoGCM) decrypt(in []byte) ([]byte, error) {
+	hlen := recordLayerHeaderSize
+
 	var h recordLayerHeader
+
+	if contentType(in[0]) == contentTypeTLS12CID {
+		h.cidLen = extensionConnectionIdSize
+		hlen += extensionConnectionIdSize
+	}
+
 	err := h.Unmarshal(in)
 	switch {
 	case err != nil:
@@ -87,12 +95,12 @@ func (c *cryptoGCM) decrypt(in []byte) ([]byte, error) {
 	case h.contentType == contentTypeChangeCipherSpec:
 		// Nothing to encrypt with ChangeCipherSpec
 		return in, nil
-	case len(in) <= (8 + recordLayerHeaderSize):
+	case len(in) <= (8 + hlen):
 		return nil, errNotEnoughRoomForNonce
 	}
 
-	nonce := append(append([]byte{}, c.remoteWriteIV[:4]...), in[recordLayerHeaderSize:recordLayerHeaderSize+8]...)
-	out := in[recordLayerHeaderSize+8:]
+	nonce := append(append([]byte{}, c.remoteWriteIV[:4]...), in[hlen:hlen+8]...)
+	out := in[hlen+8:]
 
 	var additionalData [13]byte
 	// SequenceNumber MUST be set first
@@ -107,5 +115,5 @@ func (c *cryptoGCM) decrypt(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decryptPacket: %v", err)
 	}
-	return append(in[:recordLayerHeaderSize], out...), nil
+	return append(in[:hlen], out...), nil
 }

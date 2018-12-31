@@ -2,7 +2,6 @@ package dtls
 
 import (
 	"encoding/binary"
-	"fmt"
 )
 
 type recordLayerHeader struct {
@@ -51,18 +50,14 @@ func (r *recordLayerHeader) Marshal() ([]byte, error) {
 	putBigEndianUint48(out[5:], r.sequenceNumber)
 
 	if r.contentType == contentTypeTLS12CID {
-		fmt.Printf("[recordLayerHeader::Marshal] adding CID: % x\n", r.cid)
 		copy(out[11:], r.cid)
 	}
 
 	binary.BigEndian.PutUint16(out[hlen-2:], r.contentLen)
-	fmt.Printf("[recordLayerHeader::Marshal] out: % x\n", out)
 	return out, nil
 }
 
 func (r *recordLayerHeader) Unmarshal(data []byte) error {
-	fmt.Printf("[recordLayerHeader::Unmarshal] in: % x\n", data)
-
 	r.contentType = contentType(data[0])
 	r.protocolVersion.major = data[1]
 	r.protocolVersion.minor = data[2]
@@ -73,14 +68,19 @@ func (r *recordLayerHeader) Unmarshal(data []byte) error {
 	copy(seqCopy[2:], data[5:11])
 	r.sequenceNumber = binary.BigEndian.Uint64(seqCopy)
 
+	plenOffset := 11
+
 	if r.contentType == contentTypeTLS12CID {
 		// there must be enough bytes for cid + 2 bytes for clen
 		if len(data[11:]) < r.cidLen+2 {
 			return errNotEnoughDataForCID
 		}
-		copy(r.cid, data[11:11+r.cidLen])
-		fmt.Printf("[recordLayerHeader::UnMarshal] consuming CID: % x\n", r.cid)
+		plenOffset += r.cidLen
+		r.cid = make([]byte, r.cidLen)
+		copy(r.cid, data[11:plenOffset])
 	}
+
+	r.contentLen = binary.BigEndian.Uint16(data[plenOffset : plenOffset+2])
 
 	return nil
 }

@@ -172,7 +172,6 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 
 // Write writes len(p) bytes from p to the DTLS connection
 func (c *Conn) Write(p []byte) (int, error) {
-	fmt.Printf("[Conn:Write] % x\n", p)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -271,13 +270,11 @@ func (c *Conn) internalSend(pkt *recordLayer, shouldEncrypt bool) {
 	}
 
 	if shouldEncrypt {
-		fmt.Printf("[Conn::internalSend] raw (before enc): % x\n", raw)
 		raw, err = c.cipherSuite.encrypt(pkt, raw)
 		if err != nil {
 			c.stopWithError(err)
 			return
 		}
-		fmt.Printf("[Conn::internalSend] raw (after enc): % x\n", raw)
 	}
 
 	if _, err := c.nextConn.Write(raw); err != nil {
