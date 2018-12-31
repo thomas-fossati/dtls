@@ -172,6 +172,7 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 
 // Write writes len(p) bytes from p to the DTLS connection
 func (c *Conn) Write(p []byte) (int, error) {
+	fmt.Printf("[Conn:Write] % x\n", p)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -181,16 +182,27 @@ func (c *Conn) Write(p []byte) (int, error) {
 		return 0, c.getConnErr()
 	}
 
-	c.internalSend(&recordLayer{
+	rl := &recordLayer{
 		recordLayerHeader: recordLayerHeader{
 			epoch:           c.localEpoch,
 			sequenceNumber:  c.localSequenceNumber,
 			protocolVersion: protocolVersion1_2,
 		},
-		content: &applicationData{
-			data: p,
-		},
-	}, true)
+	}
+
+	// if CID has been negotiated, use it when sending
+	// this also implies that we swap application data with tls12cid
+	cid := c.getCIDForSending()
+	if cid != nil {
+		rl.recordLayerHeader.cid = cid
+		rl.recordLayerHeader.cidLen = len(cid)
+		rl.content = &tls12cid{encdata: p}
+	} else {
+		rl.content = &applicationData{data: p}
+	}
+
+	c.internalSend(rl, true)
+
 	c.localSequenceNumber++
 
 	return len(p), nil
@@ -259,11 +271,13 @@ func (c *Conn) internalSend(pkt *recordLayer, shouldEncrypt bool) {
 	}
 
 	if shouldEncrypt {
+		fmt.Printf("[Conn::internalSend] raw (before enc): % x\n", raw)
 		raw, err = c.cipherSuite.encrypt(pkt, raw)
 		if err != nil {
 			c.stopWithError(err)
 			return
 		}
+		fmt.Printf("[Conn::internalSend] raw (after enc): % x\n", raw)
 	}
 
 	if _, err := c.nextConn.Write(raw); err != nil {
@@ -289,6 +303,13 @@ func (c *Conn) handleIncoming(buf []byte) error {
 func (c *Conn) handleIncomingPacket(buf []byte) error {
 	// TODO: avoid separate unmarshal
 	h := &recordLayerHeader{}
+
+	cid := c.getCIDForReceiving()
+	if cid != nil {
+		h.cid = cid
+		h.cidLen = len(cid)
+	}
+
 	if err := h.Unmarshal(buf); err != nil {
 		return err
 	}
@@ -334,6 +355,8 @@ func (c *Conn) handleIncomingPacket(buf []byte) error {
 		c.remoteEpoch++
 	case *applicationData:
 		c.decrypted <- content.data
+	case *tls12cid:
+		c.decrypted <- content.encdata
 	default:
 		return fmt.Errorf("Unhandled contentType %d", content.contentType())
 	}
@@ -439,4 +462,18 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 // SetWriteDeadline is a stub
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.nextConn.SetWriteDeadline(t)
+}
+
+func (c *Conn) getCIDForSending() []byte {
+	if c.isClient {
+		return c.scid
+	}
+	return c.ccid
+}
+
+func (c *Conn) getCIDForReceiving() []byte {
+	if c.isClient {
+		return c.ccid
+	}
+	return c.scid
 }

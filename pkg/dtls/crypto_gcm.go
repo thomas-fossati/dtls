@@ -44,8 +44,14 @@ func newCryptoGCM(localKey, localWriteIV, remoteKey, remoteWriteIV []byte) (*cry
 }
 
 func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
-	payload := raw[recordLayerHeaderSize:]
-	raw = raw[:recordLayerHeaderSize]
+	hlen := recordLayerHeaderSize
+
+	if pkt.recordLayerHeader.cid != nil {
+		hlen += pkt.recordLayerHeader.cidLen
+	}
+
+	payload := raw[hlen:]
+	raw = raw[:hlen]
 
 	nonce := append(append([]byte{}, c.localWriteIV[:4]...), make([]byte, 8)...)
 	if _, err := rand.Read(nonce[4:]); err != nil {
@@ -67,7 +73,7 @@ func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 	raw = append(raw, encryptedPayload...)
 
 	// Update recordLayer size to include explicit nonce
-	binary.BigEndian.PutUint16(raw[recordLayerHeaderSize-2:], uint16(len(raw)-recordLayerHeaderSize))
+	binary.BigEndian.PutUint16(raw[hlen-2:], uint16(len(raw)-hlen))
 	return raw, nil
 
 }

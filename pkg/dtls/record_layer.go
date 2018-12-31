@@ -2,6 +2,7 @@ package dtls
 
 import (
 	"encoding/binary"
+	"fmt"
 )
 
 /*
@@ -39,13 +40,17 @@ func (r *recordLayer) Marshal() ([]byte, error) {
 		return nil, err
 	}
 
-	return append(headerRaw, contentRaw...), nil
+	out := append(headerRaw, contentRaw...)
+	fmt.Printf("[recordLayer::Marshal] out: % x\n", out)
+	return out, nil
 }
 
 func (r *recordLayer) Unmarshal(data []byte) error {
 	if err := r.recordLayerHeader.Unmarshal(data); err != nil {
 		return err
 	}
+
+	hlen := recordLayerHeaderSize
 
 	switch contentType(data[0]) {
 	case contentTypeChangeCipherSpec:
@@ -56,11 +61,14 @@ func (r *recordLayer) Unmarshal(data []byte) error {
 		r.content = &handshake{}
 	case contentTypeApplicationData:
 		r.content = &applicationData{}
+	case contentTypeTLS12CID:
+		r.content = &tls12cid{}
+		hlen += extensionConnectionIdSize
 	default:
 		return errInvalidContentType
 	}
 
-	return r.content.Unmarshal(data[recordLayerHeaderSize:])
+	return r.content.Unmarshal(data[hlen:])
 }
 
 // Note that as with TLS, multiple handshake messages may be placed in
@@ -77,7 +85,12 @@ func unpackDatagram(buf []byte) ([][]byte, error) {
 			return nil, errDTLSPacketInvalidLength
 		}
 
-		pktLen := (recordLayerHeaderSize + int(binary.BigEndian.Uint16(buf[offset+11:])))
+		hlen := recordLayerHeaderSize
+		if contentType(buf[offset]) == contentTypeTLS12CID {
+			hlen += extensionConnectionIdSize
+		}
+
+		pktLen := (hlen + int(binary.BigEndian.Uint16(buf[offset+11:])))
 		out = append(out, buf[offset:offset+pktLen])
 		offset += pktLen
 	}
