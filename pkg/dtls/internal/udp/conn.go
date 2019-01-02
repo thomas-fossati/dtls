@@ -40,6 +40,8 @@ func (l *Listener) SetCidLen(v int) {
 }
 
 func (l *Listener) MoveConnToCidConns(conn *Conn, cid []byte) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
 	// TODO(tho) delete conn from conns map
 	l.cidConns[string(cid)] = conn
 }

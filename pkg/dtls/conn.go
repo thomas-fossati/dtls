@@ -35,7 +35,7 @@ type NetConnWithCid interface {
 // Conn represents a DTLS connection
 type Conn struct {
 	lock           sync.RWMutex    // Internal lock (must not be public)
-	nextConn       net.Conn        // Embedded Conn, typically a udpconn we read/write from
+	nextConn       NetConnWithCid  // Embedded Conn, typically a udpconn we read/write from
 	fragmentBuffer *fragmentBuffer // out-of-order and missing fragment handling
 	handshakeCache *handshakeCache // caching of handshake messages for verifyData generation
 	decrypted      chan []byte     // Decrypted Application Data, pull by calling `Read`
@@ -69,7 +69,7 @@ type Conn struct {
 	ccid, scid []byte // client and server connection identifiers
 }
 
-func createConn(nextConn net.Conn, flightHandler flightHandler, handshakeMessageHandler handshakeMessageHandler, config *Config, isClient bool) (*Conn, error) {
+func createConn(nextConn NetConnWithCid, flightHandler flightHandler, handshakeMessageHandler handshakeMessageHandler, config *Config, isClient bool) (*Conn, error) {
 	if config == nil {
 		return nil, errors.New("No config provided")
 	}
@@ -145,16 +145,16 @@ func Dial(network string, raddr *net.UDPAddr, config *Config) (*Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Client(pConn, config)
+	return Client(ClientUDPConnWithCid{udpConn: pConn}, config)
 }
 
 // Client establishes a DTLS connection over an existing conn
-func Client(conn net.Conn, config *Config) (*Conn, error) {
+func Client(conn NetConnWithCid, config *Config) (*Conn, error) {
 	return createConn(conn, clientFlightHandler, clientHandshakeHandler, config, true)
 }
 
 // Server listens for incoming DTLS connections
-func Server(conn net.Conn, config *Config) (*Conn, error) {
+func Server(conn NetConnWithCid, config *Config) (*Conn, error) {
 	if config == nil || config.Certificate == nil {
 		return nil, errServerMustHaveCertificate
 	}
@@ -442,8 +442,7 @@ func (c *Conn) getConnErr() error {
 }
 
 func (c *Conn) PromoteToCidConnection(cid []byte) error {
-	// return c.nextConn.PromoteToCidConnection(cid)
-	return nil
+	return c.nextConn.PromoteToCidConnection(cid)
 }
 
 // LocalAddr is a stub
