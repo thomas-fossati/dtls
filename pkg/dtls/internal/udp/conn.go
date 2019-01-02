@@ -180,6 +180,7 @@ func (l *Listener) getConn(raddr net.Addr, cid []byte) (*Conn, error) {
 		// analogous of a "connected" UDP socket receiving a datagram
 		// on an unknown 4-tuple.
 		if !ok {
+			fmt.Printf("no connection found for cid % x\n", cid)
 			return nil, errUnknownCid
 		}
 		// force update the peer's 2-tuple (in case it changed because

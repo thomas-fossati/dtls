@@ -17,7 +17,7 @@ func Listen(network string, laddr *net.UDPAddr, config *Config) (*Listener, erro
 		return nil, err
 	}
 
-	// configure connection id settings
+	// configure connection id attributes for incoming UDP packets
 	parent.SetCidLen(extensionConnectionIdSize)
 
 	return &Listener{
