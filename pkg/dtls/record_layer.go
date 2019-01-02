@@ -58,7 +58,7 @@ func (r *recordLayer) Unmarshal(data []byte) error {
 		r.content = &handshake{}
 	case contentTypeApplicationData:
 		r.content = &applicationData{}
-	case contentTypeTLS12CID:
+	case contentTypeTLS12Cid:
 		r.content = &tls12cid{}
 		hlen += extensionConnectionIdSize
 	default:
@@ -86,7 +86,7 @@ func unpackDatagram(buf []byte) ([][]byte, error) {
 		hlen := recordLayerHeaderSize
 		// take care of optional cid which shifts the length field
 		// right while extending the total header size
-		if contentType(buf[offset]) == contentTypeTLS12CID {
+		if contentType(buf[offset]) == contentTypeTLS12Cid {
 			plenOffset += extensionConnectionIdSize
 			hlen += extensionConnectionIdSize
 		}

@@ -2,6 +2,7 @@ package udp
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -10,7 +11,12 @@ import (
 
 const receiveMTU = 8192
 
-var errClosedListener = errors.New("udp: listener closed")
+var (
+	errClosedListener          = errors.New("udp: listener closed")
+	errRecordTooShort          = errors.New("udp: DTLS record too short to carry a CID")
+	errUnknownCid              = errors.New("udp: DTLS record carries a CID that is not registered")
+	errNoListenerForConnection = errors.New("udp: no listener associated with connection")
+)
 
 // Listener augments a connection-oriented Listener over a UDP PacketConn
 type Listener struct {
@@ -21,8 +27,21 @@ type Listener struct {
 	acceptCh  chan *Conn
 	doneCh    chan struct{}
 	doneOnce  sync.Once
+	cidLen    int
 
-	conns map[string]*Conn
+	conns    map[string]*Conn // maps receiver's 2-tuple into Conn
+	cidConns map[string]*Conn // maps CIDs into Conn
+}
+
+// SetCidLen sets the size in bytes of the connection id used when
+// receiving
+func (l *Listener) SetCidLen(v int) {
+	l.cidLen = v
+}
+
+func (l *Listener) MoveConnToCidConns(conn *Conn, cid []byte) {
+	// TODO(tho) delete conn from conns map
+	l.cidConns[string(cid)] = conn
 }
 
 // Accept waits for and returns the next connection to the listener.
@@ -78,6 +97,7 @@ func Listen(network string, laddr *net.UDPAddr) (*Listener, error) {
 		pConn:     conn,
 		acceptCh:  make(chan *Conn),
 		conns:     make(map[string]*Conn),
+		cidConns:  make(map[string]*Conn),
 		accepting: true,
 		doneCh:    make(chan struct{}),
 	}
@@ -85,6 +105,24 @@ func Listen(network string, laddr *net.UDPAddr) (*Listener, error) {
 	go l.readLoop()
 
 	return l, nil
+}
+
+// maybeExtractCid tries to grab the CID from the records header
+func (l Listener) maybeExtractCid(pkt []byte) ([]byte, error) {
+	if pkt[0] == 0x19 {
+		if len(pkt[11:]) < l.cidLen+2 {
+			return nil, errRecordTooShort
+		}
+
+		cid := make([]byte, l.cidLen)
+		copy(cid, pkt[11:11+l.cidLen])
+
+		fmt.Printf("[Listener::maybeExtractCid] got cid % x\n", cid)
+
+		return cid, nil
+	}
+
+	return nil, nil
 }
 
 // readLoop has to tasks:
@@ -100,7 +138,14 @@ readLoop:
 		if err != nil {
 			return
 		}
-		conn, err := l.getConn(raddr)
+
+		// peek at the header to see if the record carries a CID
+		cid, err := l.maybeExtractCid(buf)
+		if err != nil {
+			continue
+		}
+
+		conn, err := l.getConn(raddr, cid)
 		if err != nil {
 			continue
 		}
@@ -114,19 +159,44 @@ readLoop:
 	}
 }
 
-func (l *Listener) getConn(raddr net.Addr) (*Conn, error) {
+// TODO "promote connection": l.cidConns[string(cid)] = conn
+
+func (l *Listener) getConn(raddr net.Addr, cid []byte) (*Conn, error) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	conn, ok := l.conns[raddr.String()]
-	if !ok {
-		if !l.accepting {
-			return nil, errClosedListener
+	var ok bool
+	var conn *Conn
+
+	if cid != nil {
+		conn, ok = l.cidConns[string(cid)]
+		// a connection with cid is not created ex-nihil on arrival of
+		// its first packet.  instead it's an existing connection that
+		// is "promoted" by the higher layer that owns it when a cid
+		// has been successfully negotiated during DTLS handshake.
+		// therefore, a record bearing a cid that can't be found among
+		// the currently registered cid-enabled connections is
+		// something that must be dropped here and now -- it's the
+		// analogous of a "connected" UDP socket receiving a datagram
+		// on an unknown 4-tuple.
+		if !ok {
+			return nil, errUnknownCid
 		}
-		conn = l.newConn(raddr)
-		l.conns[raddr.String()] = conn
-		l.acceptCh <- conn
+		// force update the peer's 2-tuple (in case it changed because
+		// of NAT rebind or connection migration)
+		conn.SetRemoteAddr(raddr)
+	} else {
+		conn, ok = l.conns[raddr.String()]
+		if !ok {
+			if !l.accepting {
+				return nil, errClosedListener
+			}
+			conn = l.newConn(raddr, cid)
+			l.conns[raddr.String()] = conn
+			l.acceptCh <- conn
+		}
 	}
+
 	return conn, nil
 }
 
@@ -135,6 +205,7 @@ type Conn struct {
 	listener *Listener
 
 	rAddr net.Addr
+	cid   []byte
 
 	readCh chan []byte
 	sizeCh chan int
@@ -144,10 +215,11 @@ type Conn struct {
 	doneOnce sync.Once
 }
 
-func (l *Listener) newConn(rAddr net.Addr) *Conn {
+func (l *Listener) newConn(rAddr net.Addr, cid []byte) *Conn {
 	return &Conn{
 		listener: l,
 		rAddr:    rAddr,
+		cid:      cid,
 		readCh:   make(chan []byte),
 		sizeCh:   make(chan int),
 		doneCh:   make(chan struct{}),
@@ -214,6 +286,11 @@ func (c *Conn) RemoteAddr() net.Addr {
 	return c.rAddr
 }
 
+// SetRemoteAddr updates the remote address associated with this Conn
+func (c *Conn) SetRemoteAddr(v net.Addr) {
+	c.rAddr = v
+}
+
 // SetDeadline is a stub
 func (c *Conn) SetDeadline(t time.Time) error {
 	return nil
@@ -227,4 +304,19 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 // SetWriteDeadline is a stub
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return nil
+}
+
+func (c *Conn) PromoteToCidConnection(cid []byte) error {
+	c.lock.Lock()
+	l := c.listener
+	c.lock.Unlock()
+
+	if l == nil {
+		return errNoListenerForConnection
+	}
+
+	l.MoveConnToCidConns(c, cid)
+
+	return nil
+
 }

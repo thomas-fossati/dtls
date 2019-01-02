@@ -42,5 +42,5 @@ var (
 	errUnableToMarshalFragmented         = errors.New("dtls: unable to marshal fragmented handshakes")
 	errVerifyDataMismatch                = errors.New("dtls: Expected and actual verify data does not match")
 	errConnectionIdTooBig                = errors.New("dtls: the supplied connection id is bigger than 255 bytes")
-	errNotEnoughDataForCID               = errors.New("dtls: there are not enough bytes in the record header to hold the connection id")
+	errNotEnoughDataForCid               = errors.New("dtls: there are not enough bytes in the record header to hold the connection id")
 )

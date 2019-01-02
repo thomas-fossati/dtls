@@ -27,6 +27,11 @@ var invalidKeyingLabels = map[string]bool{
 type handshakeMessageHandler func(*Conn) error
 type flightHandler func(*Conn) (bool, error)
 
+type NetConnWithCid interface {
+	net.Conn
+	PromoteToCidConnection([]byte) error
+}
+
 // Conn represents a DTLS connection
 type Conn struct {
 	lock           sync.RWMutex    // Internal lock (must not be public)
@@ -191,7 +196,7 @@ func (c *Conn) Write(p []byte) (int, error) {
 
 	// if CID has been negotiated, use it when sending
 	// this also implies that we swap application data with tls12cid
-	cid := c.getCIDForSending()
+	cid := c.getCidForSending()
 	if cid != nil {
 		rl.recordLayerHeader.cid = cid
 		rl.recordLayerHeader.cidLen = len(cid)
@@ -301,7 +306,7 @@ func (c *Conn) handleIncomingPacket(buf []byte) error {
 	// TODO: avoid separate unmarshal
 	h := &recordLayerHeader{}
 
-	cid := c.getCIDForReceiving()
+	cid := c.getCidForReceiving()
 	if cid != nil {
 		h.cid = cid
 		h.cidLen = len(cid)
@@ -436,6 +441,11 @@ func (c *Conn) getConnErr() error {
 	return err.error
 }
 
+func (c *Conn) PromoteToCidConnection(cid []byte) error {
+	// return c.nextConn.PromoteToCidConnection(cid)
+	return nil
+}
+
 // LocalAddr is a stub
 func (c *Conn) LocalAddr() net.Addr {
 	return c.nextConn.LocalAddr()
@@ -461,14 +471,14 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.nextConn.SetWriteDeadline(t)
 }
 
-func (c *Conn) getCIDForSending() []byte {
+func (c *Conn) getCidForSending() []byte {
 	if c.isClient {
 		return c.scid
 	}
 	return c.ccid
 }
 
-func (c *Conn) getCIDForReceiving() []byte {
+func (c *Conn) getCidForReceiving() []byte {
 	if c.isClient {
 		return c.ccid
 	}

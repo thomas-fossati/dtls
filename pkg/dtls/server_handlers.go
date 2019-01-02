@@ -122,7 +122,9 @@ func serverHandshakeHandler(c *Conn) error {
 					return err
 				}
 				if c.scid != nil {
-					fmt.Println("TODO(tho) replace 5-tuple with c.scid")
+					if err := c.PromoteToCidConnection(c.scid); err != nil {
+						return err
+					}
 				}
 			}
 

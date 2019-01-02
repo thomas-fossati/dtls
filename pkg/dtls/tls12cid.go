@@ -5,7 +5,7 @@ type tls12cid struct {
 }
 
 func (t tls12cid) contentType() contentType {
-	return contentTypeTLS12CID
+	return contentTypeTLS12Cid
 }
 
 func (t *tls12cid) Marshal() ([]byte, error) {

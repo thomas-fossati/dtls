@@ -83,7 +83,7 @@ func (c *cryptoGCM) decrypt(in []byte) ([]byte, error) {
 
 	var h recordLayerHeader
 
-	if contentType(in[0]) == contentTypeTLS12CID {
+	if contentType(in[0]) == contentTypeTLS12Cid {
 		h.cidLen = extensionConnectionIdSize
 		hlen += extensionConnectionIdSize
 	}

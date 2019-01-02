@@ -8,7 +8,7 @@ const (
 	contentTypeAlert            contentType = 21
 	contentTypeHandshake        contentType = 22
 	contentTypeApplicationData  contentType = 23
-	contentTypeTLS12CID         contentType = 25
+	contentTypeTLS12Cid         contentType = 25
 )
 
 type content interface {

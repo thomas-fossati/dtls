@@ -16,6 +16,10 @@ func Listen(network string, laddr *net.UDPAddr, config *Config) (*Listener, erro
 	if err != nil {
 		return nil, err
 	}
+
+	// configure connection id settings
+	parent.SetCidLen(extensionConnectionIdSize)
+
 	return &Listener{
 		config: config,
 		parent: parent,

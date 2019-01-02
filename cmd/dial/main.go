@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Prepare the IP to connect to
-	addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 4444}
+	addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12345}
 
 	// Generate a certificate and private key to secure the connection
 	certificate, privateKey, genErr := dtls.GenerateSelfSigned()

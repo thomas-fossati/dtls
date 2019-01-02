@@ -37,7 +37,7 @@ func (r *recordLayerHeader) Marshal() ([]byte, error) {
 	hlen := recordLayerHeaderSize
 	// expand record header to include CID (if we have been asked to send
 	// one)
-	if r.contentType == contentTypeTLS12CID {
+	if r.contentType == contentTypeTLS12Cid {
 		hlen += r.cidLen
 	}
 
@@ -49,7 +49,7 @@ func (r *recordLayerHeader) Marshal() ([]byte, error) {
 	binary.BigEndian.PutUint16(out[3:], r.epoch)
 	putBigEndianUint48(out[5:], r.sequenceNumber)
 
-	if r.contentType == contentTypeTLS12CID {
+	if r.contentType == contentTypeTLS12Cid {
 		copy(out[11:], r.cid)
 	}
 
@@ -70,10 +70,10 @@ func (r *recordLayerHeader) Unmarshal(data []byte) error {
 
 	plenOffset := 11
 
-	if r.contentType == contentTypeTLS12CID {
+	if r.contentType == contentTypeTLS12Cid {
 		// there must be enough bytes for cid + 2 bytes for clen
 		if len(data[11:]) < r.cidLen+2 {
-			return errNotEnoughDataForCID
+			return errNotEnoughDataForCid
 		}
 		plenOffset += r.cidLen
 		r.cid = make([]byte, r.cidLen)
