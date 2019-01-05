@@ -200,7 +200,10 @@ func (c *Conn) Write(p []byte) (int, error) {
 	if cid != nil {
 		rl.recordLayerHeader.cid = cid
 		rl.recordLayerHeader.cidLen = len(cid)
-		rl.content = &tls12cid{encdata: p}
+		rl.content = &tls12cid{
+			compressed: p,
+			ct:         byte(contentTypeApplicationData),
+		}
 	} else {
 		rl.content = &applicationData{data: p}
 	}
@@ -358,7 +361,7 @@ func (c *Conn) handleIncomingPacket(buf []byte) error {
 	case *applicationData:
 		c.decrypted <- content.data
 	case *tls12cid:
-		c.decrypted <- content.encdata
+		c.decrypted <- content.compressed
 	default:
 		return fmt.Errorf("Unhandled contentType %d", content.contentType())
 	}

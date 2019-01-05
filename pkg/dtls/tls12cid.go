@@ -1,7 +1,9 @@
 package dtls
 
 type tls12cid struct {
-	encdata []byte
+	compressed []byte
+	ct         byte
+	zeroes     []byte
 }
 
 func (t tls12cid) contentType() contentType {
@@ -9,10 +11,15 @@ func (t tls12cid) contentType() contentType {
 }
 
 func (t *tls12cid) Marshal() ([]byte, error) {
-	return append([]byte{}, t.encdata...), nil
+	out := append([]byte{}, t.compressed...)
+	out = append(out, t.ct)
+	// no pad (for now)
+
+	return out, nil
 }
 
 func (t *tls12cid) Unmarshal(data []byte) error {
-	t.encdata = append([]byte{}, data...)
+	t.compressed = append([]byte{}, data[:len(data)-1]...)
+	t.ct = data[len(data)-1]
 	return nil
 }
