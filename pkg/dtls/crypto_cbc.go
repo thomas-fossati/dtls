@@ -45,8 +45,13 @@ func newCryptoCBC(localKey, localWriteIV, localMac, remoteKey, remoteWriteIV, re
 }
 
 func (c *cryptoCBC) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
-	payload := raw[recordLayerHeaderSize:]
-	raw = raw[:recordLayerHeaderSize]
+	hlen := recordLayerHeaderSize
+	if pkt.recordLayerHeader.cid != nil {
+		hlen += pkt.recordLayerHeader.cidLen
+	}
+
+	payload := raw[hlen:]
+	raw = raw[:hlen]
 	blockSize := c.writeCBC.BlockSize()
 
 	// Generate + Append MAC
@@ -81,19 +86,28 @@ func (c *cryptoCBC) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 	raw = append(raw, payload...)
 
 	// Update recordLayer size to include IV+MAC+Padding
-	binary.BigEndian.PutUint16(raw[recordLayerHeaderSize-2:], uint16(len(raw)-recordLayerHeaderSize))
+	binary.BigEndian.PutUint16(raw[hlen-2:], uint16(len(raw)-hlen))
 
 	return raw, nil
 }
 
 func (c *cryptoCBC) decrypt(in []byte) ([]byte, error) {
-	body := in[recordLayerHeaderSize:]
+	var h recordLayerHeader
+
+	hlen := recordLayerHeaderSize
+	if contentType(in[0]) == contentTypeTLS12Cid {
+		h.cidLen = extensionConnectionIdSize
+		hlen += extensionConnectionIdSize
+	}
+
+	body := in[hlen:]
 	blockSize := c.readCBC.BlockSize()
 	mac := cryptoCBCMacFunc()
 
-	var h recordLayerHeader
 	err := h.Unmarshal(in)
 	switch {
+	// TODO(tho) on contentTypeTLS12Cid ct, we need to slightly change the
+	// input into the MAC computation
 	case err != nil:
 		return nil, err
 	case h.contentType == contentTypeChangeCipherSpec:
@@ -129,5 +143,5 @@ func (c *cryptoCBC) decrypt(in []byte) ([]byte, error) {
 		return nil, errInvalidMAC
 	}
 
-	return append(in[:recordLayerHeaderSize], body[:dataEnd]...), nil
+	return append(in[:hlen], body[:dataEnd]...), nil
 }

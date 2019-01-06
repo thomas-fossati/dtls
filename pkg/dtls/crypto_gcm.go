@@ -45,7 +45,6 @@ func newCryptoGCM(localKey, localWriteIV, remoteKey, remoteWriteIV []byte) (*cry
 
 func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 	hlen := recordLayerHeaderSize
-
 	if pkt.recordLayerHeader.cid != nil {
 		hlen += pkt.recordLayerHeader.cidLen
 	}
