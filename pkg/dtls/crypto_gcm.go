@@ -44,9 +44,15 @@ func newCryptoGCM(localKey, localWriteIV, remoteKey, remoteWriteIV []byte) (*cry
 }
 
 func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
+	cid := pkt.recordLayerHeader.cid
+	cidLen := pkt.recordLayerHeader.cidLen
+	hasValidCid := (cid != nil && len(cid) >= cidLen && cidLen > 0)
+
 	hlen := recordLayerHeaderSize
-	if pkt.recordLayerHeader.cid != nil {
-		hlen += pkt.recordLayerHeader.cidLen
+	adLen := 13
+	if hasValidCid {
+		hlen += cidLen
+		adLen += 1 + cidLen // cid's len + cid
 	}
 
 	payload := raw[hlen:]
@@ -57,7 +63,8 @@ func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	var additionalData [13]byte
+	additionalData := make([]byte, adLen)
+
 	// SequenceNumber MUST be set first
 	// we only want uint48, clobbering an extra 2 (using uint64, Golang doesn't have uint48)
 	binary.BigEndian.PutUint64(additionalData[:], pkt.recordLayerHeader.sequenceNumber)
@@ -65,7 +72,13 @@ func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 	additionalData[8] = byte(pkt.content.contentType())
 	additionalData[9] = pkt.recordLayerHeader.protocolVersion.major
 	additionalData[10] = pkt.recordLayerHeader.protocolVersion.minor
-	binary.BigEndian.PutUint16(additionalData[len(additionalData)-2:], uint16(len(payload)))
+
+	if hasValidCid {
+		additionalData[11] = byte(cidLen)
+		copy(additionalData[12:12+cidLen], cid[:cidLen])
+	}
+
+	binary.BigEndian.PutUint16(additionalData[adLen-2:], uint16(len(payload)))
 	encryptedPayload := c.localGCM.Seal(nil, nonce, payload, additionalData[:])
 
 	encryptedPayload = append(nonce[4:], encryptedPayload...)
@@ -79,12 +92,16 @@ func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 
 func (c *cryptoGCM) decrypt(in []byte) ([]byte, error) {
 	hlen := recordLayerHeaderSize
+	adLen := 13
+
+	hasCid := (contentType(in[0]) == contentTypeTLS12Cid)
 
 	var h recordLayerHeader
 
-	if contentType(in[0]) == contentTypeTLS12Cid {
+	if hasCid {
 		h.cidLen = extensionConnectionIdSize
 		hlen += extensionConnectionIdSize
+		adLen += 1 + extensionConnectionIdSize // cid's len + cid
 	}
 
 	err := h.Unmarshal(in)
@@ -101,7 +118,8 @@ func (c *cryptoGCM) decrypt(in []byte) ([]byte, error) {
 	nonce := append(append([]byte{}, c.remoteWriteIV[:4]...), in[hlen:hlen+8]...)
 	out := in[hlen+8:]
 
-	var additionalData [13]byte
+	additionalData := make([]byte, adLen)
+
 	// SequenceNumber MUST be set first
 	// we only want uint48, clobbering an extra 2 (using uint64, Golang doesn't have uint48)
 	binary.BigEndian.PutUint64(additionalData[:], h.sequenceNumber)
@@ -109,7 +127,13 @@ func (c *cryptoGCM) decrypt(in []byte) ([]byte, error) {
 	additionalData[8] = byte(h.contentType)
 	additionalData[9] = h.protocolVersion.major
 	additionalData[10] = h.protocolVersion.minor
-	binary.BigEndian.PutUint16(additionalData[len(additionalData)-2:], uint16(len(out)-cryptoGCMTagLength))
+
+	if hasCid {
+		additionalData[11] = byte(h.cidLen)
+		copy(additionalData[12:12+h.cidLen], h.cid[:h.cidLen])
+	}
+
+	binary.BigEndian.PutUint16(additionalData[adLen-2:], uint16(len(out)-cryptoGCMTagLength))
 	out, err = c.remoteGCM.Open(out[:0], nonce, out, additionalData[:])
 	if err != nil {
 		return nil, fmt.Errorf("decryptPacket: %v", err)
