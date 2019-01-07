@@ -43,8 +43,8 @@ func clientCipherSuites() []cipherSuite {
 	return []cipherSuite{
 		&cipherSuiteTLSEcdheRsaWithAes256CbcSha{},
 		&cipherSuiteTLSEcdheEcdsaWithAes256CbcSha{},
-		&cipherSuiteTLSEcdheRsaWithAes128GcmSha256{},
-		&cipherSuiteTLSEcdheEcdsaWithAes128GcmSha256{},
+		//		&cipherSuiteTLSEcdheRsaWithAes128GcmSha256{},
+		//		&cipherSuiteTLSEcdheEcdsaWithAes128GcmSha256{},
 	}
 }
 

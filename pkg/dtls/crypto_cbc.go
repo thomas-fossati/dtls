@@ -57,7 +57,7 @@ func (c *cryptoCBC) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 	// Generate + Append MAC
 	h := pkt.recordLayerHeader
 
-	MAC, err := prfMac(h.epoch, h.sequenceNumber, h.contentType, h.protocolVersion, payload, c.writeMac)
+	MAC, err := prfMac(h.epoch, h.sequenceNumber, h.contentType, h.protocolVersion, h.cidLen, h.cid, payload, c.writeMac)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (c *cryptoCBC) decrypt(in []byte) ([]byte, error) {
 	dataEnd := len(body) - macSize - paddingLen
 
 	expectedMAC := body[dataEnd : dataEnd+macSize]
-	actualMAC, err := prfMac(h.epoch, h.sequenceNumber, h.contentType, h.protocolVersion, body[:dataEnd], c.readMac)
+	actualMAC, err := prfMac(h.epoch, h.sequenceNumber, h.contentType, h.protocolVersion, h.cidLen, h.cid, body[:dataEnd], c.readMac)
 
 	// Compute Local MAC and compare
 	if paddingGood != 255 || err != nil || !hmac.Equal(actualMAC, expectedMAC) {
