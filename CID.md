@@ -16,8 +16,9 @@ go get -u github.com/felipejfc/udpx
 cd ${GOPATH}/src/github.com/felipejfc/udpx
 ```
 
-- put the following in a file (e.g., `dtls.json`) under the `config` directory:
+- add the following mapping configuration:
 ```
+cat << EOF > config/dtls.json
 {
   "proxyConfigs": [
     {
@@ -30,6 +31,7 @@ cd ${GOPATH}/src/github.com/felipejfc/udpx
     }
   ]
 }
+EOF
 ```
 
 - run the proxy
