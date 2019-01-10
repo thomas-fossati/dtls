@@ -2,14 +2,21 @@
 
 - implement [DTLS CID](https://datatracker.ietf.org/doc/draft-ietf-tls-dtls-connection-id/)
 
-# howto
+# testing
+
+Go is a prerequisite -- see https://golang.org/doc/install
 
 - download udpx to simulate the NAT timeout
 ```
-go get github.com/felipejfc/udpx
+go get -u github.com/felipejfc/udpx
 ```
 
-- put the following in a file under udpx's `config` directory:
+- go to the base directory
+```
+cd ${GOPATH}/src/github.com/felipejfc/udpx
+```
+
+- put the following in a file (e.g., `dtls.json`) under the `config` directory:
 ```
 {
   "proxyConfigs": [
