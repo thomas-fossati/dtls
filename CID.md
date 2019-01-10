@@ -1,6 +1,4 @@
-# goal
-
-- implement [DTLS CID](https://datatracker.ietf.org/doc/draft-ietf-tls-dtls-connection-id/)
+[DTLS CID](https://datatracker.ietf.org/doc/draft-ietf-tls-dtls-connection-id/) implementation
 
 # testing
 
