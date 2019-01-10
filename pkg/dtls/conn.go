@@ -194,18 +194,17 @@ func (c *Conn) Write(p []byte) (int, error) {
 		},
 	}
 
+	appData := &applicationData{data: p}
+
 	// if CID has been negotiated, use it when sending
 	// this also implies that we swap application data with tls12cid
 	cid := c.getCidForSending()
 	if cid != nil {
 		rl.recordLayerHeader.cid = cid
 		rl.recordLayerHeader.cidLen = len(cid)
-		rl.content = &tls12cid{
-			compressed: p,
-			ct:         byte(contentTypeApplicationData),
-		}
+		rl.content = &tls12cid{innerContent: appData}
 	} else {
-		rl.content = &applicationData{data: p}
+		rl.content = appData
 	}
 
 	c.internalSend(rl, true)
@@ -350,7 +349,16 @@ func (c *Conn) handleIncomingPacket(buf []byte) error {
 		return err
 	}
 
-	switch content := r.content.(type) {
+	err = c.handleRecordContent(r.content)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Conn) handleRecordContent(rcontent content) error {
+	switch content := rcontent.(type) {
 	case *alert:
 		if content.alertDescription == alertCloseNotify {
 			return c.Close()
@@ -361,10 +369,12 @@ func (c *Conn) handleIncomingPacket(buf []byte) error {
 	case *applicationData:
 		c.decrypted <- content.data
 	case *tls12cid:
-		c.decrypted <- content.compressed
+		// recurse into the inner content
+		return c.handleRecordContent(rcontent.(*tls12cid).innerContent)
 	default:
 		return fmt.Errorf("Unhandled contentType %d", content.contentType())
 	}
+
 	return nil
 }
 
