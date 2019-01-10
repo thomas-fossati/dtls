@@ -4,7 +4,11 @@
 
 # testing
 
+## Go
+
 Go is a prerequisite -- see https://golang.org/doc/install
+
+## UDPX
 
 - download udpx to simulate the NAT timeout
 ```
@@ -38,13 +42,24 @@ EOF
 ```
 go run main.go start -d
 ```
+## DTLS & CID
 
-- start the DTLS server
+- download this repo
+```
+go get -u github.com/thomas-fossati/dtls
+```
+
+- move to this repo's base directory
+```
+cd ${GOPATH}/src/github.com/thomas-fossati/dtls
+```
+
+- start the DTLS server in one window
 ```
 go run cmd/listen/main.go
 ```
 
-- start the DTLS client
+- start the DTLS client in another window
 ```
 go run cmd/dial/main.go
 ```
