@@ -1,16 +1,30 @@
-# goal
+[DTLS CID](https://datatracker.ietf.org/doc/draft-ietf-tls-dtls-connection-id/) implementation
 
-- implement [DTLS CID](https://datatracker.ietf.org/doc/draft-ietf-tls-dtls-connection-id/)
+current limitations:
+- client doesn't use CID (i.e., it negotiates a zero-length CID);
+- CID use is switched on after handshake completes successfully (i.e., on application_data);
 
-# howto
+# testing
+
+## Go
+
+Go is a prerequisite -- see https://golang.org/doc/install
+
+## UDPX
 
 - download udpx to simulate the NAT timeout
 ```
-go get github.com/felipejfc/udpx
+go get -u github.com/felipejfc/udpx
 ```
 
-- put the following in a file under udpx's `config` directory:
+- go to the base directory
 ```
+cd ${GOPATH}/src/github.com/felipejfc/udpx
+```
+
+- add the following mapping configuration:
+```
+cat << EOF > config/dtls.json
 {
   "proxyConfigs": [
     {
@@ -23,19 +37,31 @@ go get github.com/felipejfc/udpx
     }
   ]
 }
+EOF
 ```
 
 - run the proxy
 ```
 go run main.go start -d
 ```
+## DTLS & CID
 
-- start the DTLS server
+- download this repo
+```
+go get -u github.com/thomas-fossati/dtls
+```
+
+- move to this repo's base directory
+```
+cd ${GOPATH}/src/github.com/thomas-fossati/dtls
+```
+
+- start the DTLS server in one window
 ```
 go run cmd/listen/main.go
 ```
 
-- start the DTLS client
+- start the DTLS client in another window
 ```
 go run cmd/dial/main.go
 ```
