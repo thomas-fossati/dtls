@@ -21,19 +21,22 @@ func (t *tls12cid) Marshal() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return append(out, byte(ct.contentType())), nil
+		out = append(out, byte(ct.contentType()))
+		out = append(out, 0x00) // 0-length pad
+
+		return out, nil
 	default:
 		return nil, fmt.Errorf("unhandled wrapped content type: %v", ct)
 	}
 }
 
 func (t *tls12cid) Unmarshal(data []byte) error {
-	t.ct = data[len(data)-1]
+	t.ct = data[len(data)-2]
 
 	switch t.ct {
 	case byte(contentTypeApplicationData):
 		t.innerContent = &applicationData{}
-		return t.innerContent.Unmarshal(data[:len(data)-1])
+		return t.innerContent.Unmarshal(data[:len(data)-2])
 	default:
 		return fmt.Errorf("unhandled wrapped content type: %v", t.ct)
 	}
