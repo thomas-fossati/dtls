@@ -212,8 +212,6 @@ func prfMac(epoch uint16, sequenceNumber uint64, contentType contentType, protoc
 
 	binary.BigEndian.PutUint16(msg[mlen-2:], uint16(len(payload)))
 
-	fmt.Printf("fixed size (%d) mac input: % x\n", mlen, msg)
-
 	if _, err := h.Write(msg); err != nil {
 		return nil, err
 	} else if _, err := h.Write(payload); err != nil {

@@ -47,6 +47,7 @@ func generateKeySignature(clientRandom, serverRandom, publicKey []byte, namedCur
 	return nil, errKeySignatureGenerateUnimplemented
 }
 
+// TODO(tho) handle RSA signatures
 func verifyKeySignature(hash, remoteKeySignature []byte, certificate *x509.Certificate) error {
 	switch p := certificate.PublicKey.(type) {
 	case *ecdsa.PublicKey:

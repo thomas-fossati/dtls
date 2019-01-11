@@ -24,6 +24,7 @@ func (h *handshakeMessageCertificate) Marshal() ([]byte, error) {
 	return append(out, h.certificate.Raw...), nil
 }
 
+// TODO(tho) handle |certs| > 1
 func (h *handshakeMessageCertificate) Unmarshal(data []byte) error {
 	if len(data) < 6 {
 		return errBufferTooSmall
