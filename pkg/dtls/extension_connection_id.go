@@ -28,7 +28,7 @@ func (e *extensionConnectionId) Marshal() ([]byte, error) {
 
 	binary.BigEndian.PutUint16(out, uint16(e.extensionValue()))
 	binary.BigEndian.PutUint16(out[2:], uint16(l+1))
-	// CID is encoded as a variable-length array of at least 255 bytes
+	// CID is encoded as a variable-length array of at most 255 bytes
 	out[4] = byte(l)
 	out = append(out, e.connectionId[:l]...)
 

@@ -106,8 +106,6 @@ func (c *cryptoCBC) decrypt(in []byte) ([]byte, error) {
 
 	err := h.Unmarshal(in)
 	switch {
-	// TODO(tho) on contentTypeTLS12Cid ct, we need to slightly change the
-	// input into the MAC computation
 	case err != nil:
 		return nil, err
 	case h.contentType == contentTypeChangeCipherSpec:
