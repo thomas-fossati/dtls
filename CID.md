@@ -1,5 +1,9 @@
 [DTLS CID](https://datatracker.ietf.org/doc/draft-ietf-tls-dtls-connection-id/) implementation
 
+current limitations:
+- client doesn't use CID (i.e., it negotiates a zero-length CID);
+- CID use is switched on after handshake completes successfully (i.e., on application_data);
+
 # testing
 
 ## Go
