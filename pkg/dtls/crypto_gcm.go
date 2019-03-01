@@ -74,8 +74,8 @@ func (c *cryptoGCM) encrypt(pkt *recordLayer, raw []byte) ([]byte, error) {
 	additionalData[10] = pkt.recordLayerHeader.protocolVersion.minor
 
 	if hasValidCid {
-		additionalData[11] = byte(cidLen)
-		copy(additionalData[12:12+cidLen], cid[:cidLen])
+		copy(additionalData[11:11+cidLen], cid[:cidLen])
+		additionalData[11+cidLen] = byte(cidLen)
 	}
 
 	binary.BigEndian.PutUint16(additionalData[adLen-2:], uint16(len(payload)))
@@ -129,8 +129,8 @@ func (c *cryptoGCM) decrypt(in []byte) ([]byte, error) {
 	additionalData[10] = h.protocolVersion.minor
 
 	if hasCid {
-		additionalData[11] = byte(h.cidLen)
-		copy(additionalData[12:12+h.cidLen], h.cid[:h.cidLen])
+		copy(additionalData[11:11+h.cidLen], h.cid[:h.cidLen])
+		additionalData[11+h.cidLen] = byte(h.cidLen)
 	}
 
 	binary.BigEndian.PutUint16(additionalData[adLen-2:], uint16(len(out)-cryptoGCMTagLength))
