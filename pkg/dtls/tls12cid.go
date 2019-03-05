@@ -5,7 +5,6 @@ import "fmt"
 type tls12cid struct {
 	innerContent content
 	ct           byte
-	zeroes       []byte
 }
 
 func (t tls12cid) contentType() contentType {
@@ -22,22 +21,36 @@ func (t *tls12cid) Marshal() ([]byte, error) {
 			return nil, err
 		}
 		out = append(out, byte(ct.contentType()))
-		out = append(out, 0x00) // 0-length pad
+		// add one byte of padding (only to exercise our peers)
+		out = append(out, 0x00)
 
 		return out, nil
 	default:
-		return nil, fmt.Errorf("unhandled wrapped content type: %v", ct)
+		return nil, fmt.Errorf("marshal: unhandled wrapped content type: %v", ct)
 	}
 }
 
-func (t *tls12cid) Unmarshal(data []byte) error {
-	t.ct = data[len(data)-2]
+func (t *tls12cid) Unmarshal(paddedData []byte) error {
+	data := removePadding(paddedData)
+
+	t.ct = data[len(data)-1]
 
 	switch t.ct {
 	case byte(contentTypeApplicationData):
 		t.innerContent = &applicationData{}
-		return t.innerContent.Unmarshal(data[:len(data)-2])
+		return t.innerContent.Unmarshal(data[:len(data)-1])
 	default:
-		return fmt.Errorf("unhandled wrapped content type: %v", t.ct)
+		return fmt.Errorf("unmarshal: unhandled wrapped content type: %v", t.ct)
 	}
+}
+
+func removePadding(buf []uint8) []uint8 {
+	bufLen := len(buf)
+	i := bufLen - 1
+
+	for i >= 0 && buf[i] == 0x00 {
+		i--
+	}
+
+	return buf[:i+1]
 }
