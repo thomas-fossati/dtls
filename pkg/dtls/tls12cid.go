@@ -45,9 +45,7 @@ func (t *tls12cid) Unmarshal(paddedData []byte) error {
 }
 
 func removePadding(buf []uint8) []uint8 {
-	bufLen := len(buf)
-	i := bufLen - 1
-
+	i := len(buf) - 1
 	for i >= 0 && buf[i] == 0x00 {
 		i--
 	}
